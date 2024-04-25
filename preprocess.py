@@ -2,9 +2,10 @@ import pandas as pd
 from sklearn.preprocessing import OneHotEncoder
 
 
-DATA_IN_PATH = "data/2022_public_lar_csv.csv"
+DATA_PATH = "data/2022_public_lar_csv.csv"
 FILTERED_PATH = "data/filtered_ma.csv"
-DATA_OUT_PATH = "data/data.csv"
+FEATURES_PATH = "data/features.csv"
+LABELS_PATH = "data/labels.csv"
 COLS = [
     "action_taken",
     "applicant_age",
@@ -23,7 +24,6 @@ COLS = [
     "property_value",
 ]
 CATEG_COLS = [
-    "action_taken",
     "applicant_age",
     "debt_to_income_ratio",
     "derived_ethnicity",
@@ -68,7 +68,7 @@ def main():
     try:
         df = pd.read_csv(FILTERED_PATH)
     except FileNotFoundError:
-        df = pd.read_csv(DATA_IN_PATH)
+        df = pd.read_csv(DATA_PATH)
         df = df[df["state_code"] == "MA"][COLS]
         df.to_csv(FILTERED_PATH, index=False)
 
@@ -83,11 +83,16 @@ def main():
         one_hot_encoded,
         columns=encoder.get_feature_names_out(CATEG_COLS),
     )
-    df = df.drop(columns=CATEG_COLS, axis=1)
+    df.drop(columns=CATEG_COLS, axis=1, inplace=True)
     df = pd.concat([df, one_hot_df], axis=1, copy=False)
 
-    # Write to a new CSV file.
-    df.to_csv(DATA_OUT_PATH, index=False)
+    # Split data into features and target.
+    X = df.drop(columns=["action_taken"], axis=1)
+    y = df["action_taken"]
+
+    # Write the features and labels to CSV files.
+    X.to_csv(FEATURES_PATH, index=False)
+    y.to_csv(LABELS_PATH, index=False)
 
 
 if __name__ == "__main__":
