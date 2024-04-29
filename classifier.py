@@ -1,6 +1,6 @@
 import numpy as np
 from numpy.linalg import norm
-from scipy.special import logsumexp
+from scipy.special import softmax
 from tqdm import tqdm
 
 def one_hot(arr, dim):
@@ -9,10 +9,6 @@ def one_hot(arr, dim):
     for i in range(len(arr)):
         res[i][arr[i]] = 1
     return res
-
-def softmax(y):
-    '''custom softmax using logsumexp.'''
-    return np.exp(y)/np.exp(logsumexp(y,axis=-1,keepdims=True))
 
 class SoftmaxRegression:
     def __init__(self, eta, lam):
@@ -45,7 +41,8 @@ class SoftmaxRegression:
             grad = X.T@lhs + self.lam*self.W # k x d
             self.W -= self.eta * grad
         self.W = self.W.T
-        pass
+
+        print(self.W)
 
     def predict(self, X_pred):
         """
