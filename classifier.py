@@ -1,6 +1,7 @@
 import numpy as np
 from numpy.linalg import norm
 from scipy.special import logsumexp
+from tqdm import tqdm
 
 def one_hot(arr, dim):
     '''returns one-hot representation of y.'''
@@ -18,7 +19,7 @@ class SoftmaxRegression:
         self.eta = eta
         self.lam = lam
         self.W = None
-        self.runs = 200000
+        self.runs = 200
 
     def fit(self, X, y):
         """
@@ -36,10 +37,10 @@ class SoftmaxRegression:
         X = np.hstack((np.array([[1] for i in range(len(X))]), np.array(X)))
         num_classes = 1 + y.max()
         num_features = X.shape[1]
-        self.W = np.ones((num_classes, num_features))
+        self.W = np.ones((num_classes, num_features)).T
         
         print(X.shape, self.W.shape, one_hot(y, num_classes).shape)
-        for i in range(self.runs):
+        for i in tqdm(range(self.runs)):
             lhs = (softmax(X@self.W)-one_hot(y, num_classes)) # k x n
             grad = X.T@lhs + self.lam*self.W # k x d
             self.W -= self.eta * grad
@@ -91,9 +92,9 @@ def main():
 
     regressor = SoftmaxRegression(eta=0.001, lam=0.001)
     regressor.fit(features_train, labels_train)
-    
 
-    predictions = regressor.fit(features_test)
+
+    predictions = regressor.predict(features_test)
     correct = np.sum(predictions == labels_test)
     print(correct / len(labels_test))
 
