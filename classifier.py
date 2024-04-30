@@ -1,8 +1,14 @@
 import numpy as np
-from numpy.linalg import norm
 from scipy.special import softmax
 from tqdm import tqdm
+import torch
+import torch.nn as nn
+from torch.utils.data import TensorDataset, DataLoader
 
+from graphviz import Digraph
+import torch
+from torch.autograd import Variable
+from torchviz import make_dot
 
 def one_hot(arr, dim):
     """Returns one-hot representation of y."""
@@ -70,31 +76,71 @@ class SoftmaxRegression:
         :return: a 2D numpy array of predicted class probabilities (Dwarf=index 0, Giant=index 1, Supergiant=index 2).
                  Shape should be (n x 3)
         """
-        print("is thie working")
         X_pred = np.hstack((np.array([[1] for i in range(len(X_pred))]), X_pred))  # add bias
         y_pred = np.array(softmax(X_pred @ self.W.T))
         return y_pred
 
+class LogisticRegression(nn.Module):
+    def __init__(self, n_inputs, n_outputs):
+        super(LogisticRegression, self).__init__()
+        self.linear = nn.Linear(n_inputs, n_outputs)
+    
+    def forward(self, x):
+        linear = self.linear(x)
+        pred = torch.sigmoid(linear)
+        return pred
+        
 
 def main():
-    features = np.loadtxt(open("data/features.csv", "rb"), delimiter=",", skiprows=1)
-    labels = np.loadtxt(open("data/labels.csv", "rb"), delimiter=",", skiprows=1, dtype=int)
+    features = np.loadtxt(open("data/features.csv", "rb"), delimiter=",", skiprows=1, dtype=np.float32)
+    labels = np.loadtxt(open("data/labels.csv", "rb"), delimiter=",", skiprows=1, dtype=np.float32)
 
-    features_train = features[: int(len(features) * 0.75)]
-    features_test = features[int(len(features) * 0.75) :]
+    features_train = torch.tensor(features[:int(len(features) * 0.75)], requires_grad=True)
+    features_test = torch.tensor(features[int(len(features) * 0.75):], requires_grad=True)
 
-    labels_train = labels[: int(len(features) * 0.75)]
-    labels_test = labels[int(len(features) * 0.75) :]
+    labels_train = torch.tensor(labels[:int(len(features) * 0.75)], requires_grad=True)
+    labels_test = torch.tensor(labels[int(len(features) * 0.75):], requires_grad=True)
 
-    print(features.shape, features_train.shape)
-    print(labels.shape, labels_train.shape)
+    torch_regressor = LogisticRegression(len(features_train[0]), 1)
+    
+    train_dataset = TensorDataset(features_train, labels_train)
+    test_dataset = TensorDataset(features_test, labels_test)
+    train_dataloader = DataLoader(train_dataset, batch_size=1024)
+    test_dataloader = DataLoader(test_dataset, batch_size=1024)
 
-    regressor = SoftmaxRegression(eta=1e-3, lam=1e-3)
-    regressor.fit(features_train, labels_train)
+    # defining the optimizer
+    optimizer = torch.optim.Adam(torch_regressor.parameters(), lr=0.001)
+    # defining Cross-Entropy loss
+    criterion = nn.MSELoss()
 
-    predictions = regressor.predict(features_test)
-    correct = np.sum(predictions == labels_test)
-    print(correct / len(labels_test))
+    epochs = 50
+    for epoch in range(epochs):
+        torch_regressor.train()
+        for applicants, labels in tqdm(train_dataloader):
+            optimizer.zero_grad()
+            outputs = torch_regressor(applicants)
+            loss = criterion(outputs, labels.unsqueeze(1))
+            loss.backward()
+            optimizer.step()
+
+        correct = 0
+        torch_regressor.eval()
+        for applicants, labels in test_dataloader:
+            outputs = torch_regressor(applicants)
+            predicted = outputs.squeeze().round()
+            correct += (predicted == labels).sum()
+        accuracy = 100 * (correct.item()) / len(test_dataset)
+        print('Epoch: {}. Loss: {}. Accuracy: {}'.format(epoch, loss.item(), accuracy))
+
+    # print(features.shape, features_train.shape)
+    # print(labels.shape, labels_train.shape)
+
+    # regressor = SoftmaxRegression(eta=1e-3, lam=1e-3)
+    # regressor.fit(features_train, labels_train)
+
+    # predictions = regressor.predict(features_test)
+    # correct = np.sum(predictions == labels_test)
+    # print(correct / len(labels_test))
 
 
 if __name__ == "__main__":
