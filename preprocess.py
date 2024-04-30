@@ -3,7 +3,7 @@ from sklearn.preprocessing import OneHotEncoder
 
 
 DATA_PATH = "data/2022_public_lar_csv.csv"
-FILTERED_PATH = "data/filtered_ma.csv"
+FILTERED_PATH = "data/filtered.csv"
 FEATURES_PATH = "data/features.csv"
 LABELS_PATH = "data/labels.csv"
 COLS = [
@@ -39,9 +39,9 @@ def preprocess(df, col):
     """Preprocess a column in the DataFrame."""
 
     if col == "action_taken":
-        # Transform (1, 2, 8) -> 0 and (3, 7) -> 1.
-        df = df[df[col].isin([1, 2, 3, 7, 8])]
-        df.loc[:, col] = df[col].replace({1: 0, 2: 0, 8: 0, 3: 1, 7: 1})
+        # Transform (1, 2, 8) -> 1 and (3) -> 0.
+        df = df[df[col].isin([1, 2, 3, 8])]
+        df.loc[:, col] = df[col].replace({1: 1, 2: 1, 8: 1, 3: 0})
     elif col == "debt_to_income_ratio":
         # Replace "Exempt" and NaN with mode.
         df.loc[:, col] = df[col].replace("Exempt", None)
@@ -69,12 +69,14 @@ def main():
         df = pd.read_csv(FILTERED_PATH)
     except FileNotFoundError:
         df = pd.read_csv(DATA_PATH)
-        df = df[df["state_code"] == "MA"][COLS]
+        df = df[df["state_code"] == "VT"][COLS]
         df.to_csv(FILTERED_PATH, index=False)
 
     # Preprocess each column.
     for col in COLS:
         df = preprocess(df, col).reset_index(drop=True)
+
+    df.to_csv("data/preonehot.csv", index=False)
 
     # Perform one-hot encoding on categorical columns.
     encoder = OneHotEncoder(sparse_output=False)
