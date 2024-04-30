@@ -8,6 +8,10 @@ from torch.utils.data import TensorDataset, DataLoader
 ALPHA = 0.05
 GAMMA = 0.1
 
+def crush_linear(x):
+    y = 0.2 * x + 0.5
+    return torch.clamp(y, min = 0, max = 1)
+
 class LogisticRegression(nn.Module):
     def __init__(self, n_inputs, n_outputs):
         super(LogisticRegression, self).__init__()
@@ -15,7 +19,7 @@ class LogisticRegression(nn.Module):
 
     def forward(self, x):
         linear = self.linear(x)
-        pred = torch.sigmoid(linear)
+        pred = crush_linear(linear)
         return pred
 
 def main():
