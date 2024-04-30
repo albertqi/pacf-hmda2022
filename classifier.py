@@ -5,10 +5,9 @@ import torch
 import torch.nn as nn
 from torch.utils.data import TensorDataset, DataLoader
 
-from graphviz import Digraph
-import torch
-from torch.autograd import Variable
-from torchviz import make_dot
+GAMMA = 0.1
+ALPHA = 0.05
+
 
 def one_hot(arr, dim):
     """Returns one-hot representation of y."""
@@ -16,6 +15,7 @@ def one_hot(arr, dim):
     for i in range(len(arr)):
         res[i][arr[i]] = 1
     return res
+
 
 class SoftmaxRegression:
     def __init__(self, eta, lam):
@@ -63,7 +63,9 @@ class SoftmaxRegression:
         :return: a 1D numpy array of predicted classes (Dwarf=0, Giant=1, Supergiant=2).
                  Shape should be (n,)
         """
-        X_pred = np.hstack((np.array([[1] for i in range(len(X_pred))]), np.array(X_pred)))  # add bias
+        X_pred = np.hstack(
+            (np.array([[1] for i in range(len(X_pred))]), np.array(X_pred))
+        )  # add bias
         y_pred = np.array(softmax(X_pred @ self.W.T))
         y_pred = [np.argmax(y) for y in y_pred]
         return np.array(y_pred)
@@ -76,36 +78,52 @@ class SoftmaxRegression:
         :return: a 2D numpy array of predicted class probabilities (Dwarf=index 0, Giant=index 1, Supergiant=index 2).
                  Shape should be (n x 3)
         """
-        X_pred = np.hstack((np.array([[1] for i in range(len(X_pred))]), X_pred))  # add bias
+        X_pred = np.hstack(
+            (np.array([[1] for i in range(len(X_pred))]), X_pred)
+        )  # add bias
         y_pred = np.array(softmax(X_pred @ self.W.T))
         return y_pred
+
 
 class LogisticRegression(nn.Module):
     def __init__(self, n_inputs, n_outputs):
         super(LogisticRegression, self).__init__()
         self.linear = nn.Linear(n_inputs, n_outputs)
-    
+
     def forward(self, x):
         linear = self.linear(x)
         pred = torch.sigmoid(linear)
         return pred
-        
+
 
 def main():
-    features = np.loadtxt(open("data/features.csv", "rb"), delimiter=",", skiprows=1, dtype=np.float32)
-    labels = np.loadtxt(open("data/labels.csv", "rb"), delimiter=",", skiprows=1, dtype=np.float32)
+    device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+    torch.multiprocessing.set_sharing_strategy("file_system")
 
-    features_train = torch.tensor(features[:int(len(features) * 0.75)], requires_grad=True)
-    features_test = torch.tensor(features[int(len(features) * 0.75):], requires_grad=True)
+    features = np.loadtxt(
+        open("data/features.csv", "rb"), delimiter=",", skiprows=1, dtype=np.float32
+    )
+    labels = np.loadtxt(
+        open("data/labels.csv", "rb"), delimiter=",", skiprows=1, dtype=np.float32
+    )
+    np.random.shuffle(features)
+    np.random.shuffle(labels)
 
-    labels_train = torch.tensor(labels[:int(len(features) * 0.75)], requires_grad=True)
-    labels_test = torch.tensor(labels[int(len(features) * 0.75):], requires_grad=True)
+    features_train = torch.tensor(
+        features[: int(len(features) * 0.75)], requires_grad=True
+    )
+    features_test = torch.tensor(
+        features[int(len(features) * 0.75) :], requires_grad=True
+    )
 
-    torch_regressor = LogisticRegression(len(features_train[0]), 1)
-    
+    labels_train = torch.tensor(labels[: int(len(features) * 0.75)], requires_grad=True)
+    labels_test = torch.tensor(labels[int(len(features) * 0.75) :], requires_grad=True)
+
+    torch_regressor = LogisticRegression(len(features_train[0]), 1).to(device)
+
     train_dataset = TensorDataset(features_train, labels_train)
     test_dataset = TensorDataset(features_test, labels_test)
-    train_dataloader = DataLoader(train_dataset, batch_size=1024)
+    train_dataloader = DataLoader(train_dataset, batch_size=1024, shuffle=True)
     test_dataloader = DataLoader(test_dataset, batch_size=1024)
 
     # defining the optimizer
@@ -117,6 +135,7 @@ def main():
     for epoch in range(epochs):
         torch_regressor.train()
         for applicants, labels in tqdm(train_dataloader):
+            applicants, labels = applicants.to(device), labels.to(device)
             optimizer.zero_grad()
             outputs = torch_regressor(applicants)
             loss = criterion(outputs, labels.unsqueeze(1))
@@ -126,11 +145,13 @@ def main():
         correct = 0
         torch_regressor.eval()
         for applicants, labels in test_dataloader:
-            outputs = torch_regressor(applicants)
+            applicants, labels = applicants.to(device), labels.to(device)
+            with torch.no_grad():
+                outputs = torch_regressor(applicants)
             predicted = outputs.squeeze().round()
             correct += (predicted == labels).sum()
         accuracy = 100 * (correct.item()) / len(test_dataset)
-        print('Epoch: {}. Loss: {}. Accuracy: {}'.format(epoch, loss.item(), accuracy))
+        print("Epoch: {}. Loss: {}. Accuracy: {}".format(epoch, loss.item(), accuracy))
 
     # print(features.shape, features_train.shape)
     # print(labels.shape, labels_train.shape)
