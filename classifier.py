@@ -5,11 +5,6 @@ import torch
 import torch.nn as nn
 from torch.utils.data import TensorDataset, DataLoader
 
-from graphviz import Digraph
-import torch
-from torch.autograd import Variable
-from torchviz import make_dot
-
 def one_hot(arr, dim):
     """Returns one-hot representation of y."""
     res = np.zeros((len(arr), dim))
@@ -87,8 +82,8 @@ class LogisticRegression(nn.Module):
     
     def forward(self, x):
         linear = self.linear(x)
-        pred = torch.sigmoid(linear)
-        return pred
+        # pred = torch.sigmoid(linear)
+        return linear
         
 
 def main():
@@ -96,22 +91,22 @@ def main():
     labels = np.loadtxt(open("data/labels.csv", "rb"), delimiter=",", skiprows=1, dtype=np.float32)
 
     features_train = torch.tensor(features[:int(len(features) * 0.75)], requires_grad=True)
-    features_test = torch.tensor(features[int(len(features) * 0.75):], requires_grad=True)
+    features_test = torch.tensor(features[int(len(features) * 0.75):], requires_grad=False)
 
     labels_train = torch.tensor(labels[:int(len(features) * 0.75)], requires_grad=True)
-    labels_test = torch.tensor(labels[int(len(features) * 0.75):], requires_grad=True)
+    labels_test = torch.tensor(labels[int(len(features) * 0.75):], requires_grad=False)
 
     torch_regressor = LogisticRegression(len(features_train[0]), 1)
     
     train_dataset = TensorDataset(features_train, labels_train)
     test_dataset = TensorDataset(features_test, labels_test)
-    train_dataloader = DataLoader(train_dataset, batch_size=1024)
-    test_dataloader = DataLoader(test_dataset, batch_size=1024)
+    train_dataloader = DataLoader(train_dataset, batch_size=64)
+    test_dataloader = DataLoader(test_dataset, batch_size=64)
 
     # defining the optimizer
     optimizer = torch.optim.Adam(torch_regressor.parameters(), lr=0.001)
     # defining Cross-Entropy loss
-    criterion = nn.MSELoss()
+    criterion = nn.BCELoss()
 
     epochs = 50
     for epoch in range(epochs):
@@ -122,15 +117,15 @@ def main():
             loss = criterion(outputs, labels.unsqueeze(1))
             loss.backward()
             optimizer.step()
-
-        correct = 0
-        torch_regressor.eval()
-        for applicants, labels in test_dataloader:
-            outputs = torch_regressor(applicants)
-            predicted = outputs.squeeze().round()
-            correct += (predicted == labels).sum()
-        accuracy = 100 * (correct.item()) / len(test_dataset)
-        print('Epoch: {}. Loss: {}. Accuracy: {}'.format(epoch, loss.item(), accuracy))
+        with torch.no_grad():
+            correct = 0
+            torch_regressor.eval()
+            for applicants, labels in test_dataloader:
+                outputs = torch_regressor(applicants)
+                predicted = outputs.squeeze().round()
+                correct += (predicted == labels).sum()
+            accuracy = 100 * (correct.item()) / len(test_dataset)
+            print('Epoch: {}. Loss: {}. Accuracy: {}'.format(epoch, loss.item(), accuracy))
 
     # print(features.shape, features_train.shape)
     # print(labels.shape, labels_train.shape)
