@@ -3,25 +3,42 @@
 
 
 import numpy as np
+import os
 from sklearn.preprocessing import normalize
+from tqdm import tqdm
 
 
 ALPHA = 0.05
-NUM_REPS = 10  # Number of representatives.
-DATA_PATH = "data/features.csv"
+NUM_REPS = 5  # Number of representatives.
+DATA_DIR = "data"
 METRIC_DIR = "metric"
+
+
+submetrics = {}  # submetrics.get(r)[x][y] = distance between `x` and `y` w.r.t. `r`.
+real_dists = []  # real_dists[r][x] = distance between `r` and `x`.
 
 
 def triplet_query(row, x, y):
     """Return whether `x` (0) or `y` (1) is closer to a representative row."""
 
-    return np.argmin([np.linalg.norm(row - x), np.linalg.norm(row - y)])
+    return np.argmin([np.linalg.norm(row[1:] - x[1:]), np.linalg.norm(row[1:] - y[1:])])
 
 
 def real_query(r, x):
     """Return the distance between representative `r` and point `x`."""
 
+    if real_dists[r][x] != -1.0:
+        return real_dists[r][x]
+
+    with open(f"{DATA_DIR}/preonehot.csv", "rb") as f:
+        data = np.loadtxt(f, delimiter=",", dtype=np.dtypes.StrDType)
+        cols, row_r, row_x = data[0], data[r + 1], data[x + 1]
+        print()
+        for a, b, c in zip(cols, row_r, row_x):
+            print(f"{a}: {b} vs. {c}")
+
     dist = float(input(f"Enter distance between {r} and {x}: "))
+    real_dists[r][x] = dist
     return dist
 
 
@@ -39,7 +56,7 @@ def merge(row, left, right):
             j += 1
     res.extend(left[i:])
     res.extend(right[j:])
-    return res
+    return np.array(res)
 
 
 def merge_sort(row, data):
@@ -59,21 +76,30 @@ def create_submetric(r, data):
     data = merge_sort(data[r], data)
     D = np.zeros((len(data), len(data)))
 
+    def ind(x):
+        # Return the index of the row in the data.
+        return int(data[x][0])
+
+    # Sanity check.
+    assert ind(0) == r
+    r = 0
+
     def label(left, right):
-        if abs(real_query(r, left) - real_query(r, right)) > ALPHA:
+        if abs(real_query(ind(r), ind(left)) - real_query(ind(r), ind(right))) > ALPHA:
             mid = (left + right) // 2
             label(left, mid)
             label(mid + 1, right)
         else:
             for x in range(left, right + 1):
-                D[r][x] = real_query(r, left)
+                D[ind(r)][ind(x)] = real_query(ind(r), ind(left))
 
     label(0, len(data) - 1)
 
-    for i in range(len(data)):
-        for j in range(len(data)):
-            D[i][j] = abs(D[r][i] - D[r][j])
+    for x in tqdm(range(len(data))):
+        for y in range(len(data)):
+            D[ind(x)][ind(y)] = abs(D[ind(r)][ind(x)] - D[ind(r)][ind(y)])
 
+    np.save(f"{METRIC_DIR}/submetric_{ind(r)}.npy", D)
     return D
 
 
@@ -84,18 +110,31 @@ def max_merge(num_reps, data):
     D = np.zeros((len(data), len(data)))
     for r in reps:
         D = np.maximum(D, create_submetric(r, data))
+    for submetric in submetrics.values():
+        D = np.maximum(D, submetric)
     return D
 
 
 def main():
     """Find an alpha-submetric."""
 
-    with open(DATA_PATH, "rb") as f:
+    with open(f"{DATA_DIR}/features.csv", "rb") as f:
         data = np.loadtxt(f, delimiter=",", skiprows=1, dtype=np.float32)
 
+    # Open all submetrics.
+    global submetrics
+    for filename in os.listdir(METRIC_DIR):
+        if filename.startswith("submetric_"):
+            r = int(filename.split("_")[1].split(".")[0])
+            submetrics[r] = np.load(f"{METRIC_DIR}/{filename}")
+
+    global real_dists
+    real_dists = np.full((len(data), len(data)), -1.0, dtype=np.float32)
+
     data = normalize(data, axis=0)
-    D = max_merge(NUM_REPS, data)
-    print(D)
+    data = np.insert(data, 0, np.arange(len(data)), axis=1)  # Add index column.
+    D = max_merge(NUM_REPS - len(submetrics), data)
+    np.save(f"{METRIC_DIR}/metric.npy", D)
 
 
 if __name__ == "__main__":
