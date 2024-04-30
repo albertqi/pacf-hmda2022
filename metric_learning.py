@@ -17,6 +17,8 @@ METRIC_DIR = "metric"
 submetrics = {}  # submetrics.get(r)[x][y] = distance between `x` and `y` w.r.t. `r`.
 real_dists = []  # real_dists[r][x] = distance between `r` and `x`.
 
+bounds = {}  # bounds[x] = (dist. on left, dist. on right) of `x`.
+
 
 def triplet_query(row, x, y):
     """Return whether `x` (0) or `y` (1) is closer to a representative row."""
@@ -36,6 +38,8 @@ def real_query(r, x):
         print()
         for a, b, c in zip(cols, row_r, row_x):
             print(f"{a}: {b} vs. {c}")
+        bnds = bounds.get(x, (-1, -1))
+        print(f"bounds: {bnds[0]} vs. {bnds[1]}")
 
     dist = float(input(f"Enter distance between {r} and {x}: "))
     real_dists[r][x] = dist
@@ -84,11 +88,17 @@ def create_submetric(r, data):
     assert ind(0) == r
     r = 0
 
+    global bounds
+
     def label(left, right):
         if abs(real_query(ind(r), ind(left)) - real_query(ind(r), ind(right))) > ALPHA:
             mid = (left + right) // 2
+            bounds[ind(mid)] = (
+                real_query(ind(r), ind(left)),
+                real_query(ind(r), ind(right)),
+            )
             label(left, mid)
-            label(mid + 1, right)
+            label(mid, right)
         else:
             for x in range(left, right + 1):
                 D[ind(r)][ind(x)] = real_query(ind(r), ind(left))
