@@ -8,7 +8,7 @@ from sklearn.preprocessing import normalize
 from tqdm import tqdm
 
 
-ALPHA = 0.05
+ALPHA = 0.1
 NUM_REPS = 5  # Number of representatives.
 DATA_DIR = "data"
 METRIC_DIR = "metric"
