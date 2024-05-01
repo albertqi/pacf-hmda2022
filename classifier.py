@@ -2,17 +2,17 @@
 # https://proceedings.mlr.press/v80/yona18a/yona18a.pdf
 
 
+from common import DATA_DIR, METRIC_DIR
 import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
 from tqdm import tqdm
 
-from common import DATA_DIR, METRIC_DIR
-
 
 ALPHA = 0.05
 GAMMA = 0.1
+
 
 metric = None
 
@@ -48,7 +48,6 @@ def mf_violation_loss(model, idx, x, prediction, train_dataset):
     sample = sample[:, 1:]
 
     pred_p = model(sample)
-    print(prediction, pred_p)
     total_loss = torch.max(
         torch.tensor(0.0), torch.abs(prediction - pred_p) - dist(idx, sample_idx)
     )
@@ -113,7 +112,6 @@ def main():
             mf_loss = mf_violation_loss(
                 torch_regressor, idx, applicants, outputs, train_dataset
             )
-            print(mf_loss.mean())
             if mf_loss.mean() >= ALPHA * GAMMA:
                 mf_loss.backward()
             else:
