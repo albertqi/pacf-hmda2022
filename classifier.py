@@ -22,7 +22,18 @@ class LogisticRegression(nn.Module):
         pred = crush_linear(linear)
         return pred
 
+def mf_violation_loss(model, x, prediction, metric, train_dataset):
+    sample_idx = torch.randint(high = len(train_dataset))
+    sample = train_dataset[sample_idx]
+
+    total_loss = torch.tensor(0., requires_grad=True)
+    for applicant in sample:
+        pred_p = model(applicant)
+        total_loss += torch.max(0, torch.abs(prediction - pred_p) - METRIC(x, applicant))
+    return total_loss
+
 def main():
+    torch.manual_seed(1)
     device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
 
     features = np.loadtxt(
@@ -48,15 +59,15 @@ def main():
 
     train_dataset = TensorDataset(features_train, labels_train)
     test_dataset = TensorDataset(features_test, labels_test)
-    train_dataloader = DataLoader(train_dataset, batch_size=1024)
-    test_dataloader = DataLoader(test_dataset, batch_size=1024)
+    train_dataloader = DataLoader(train_dataset, batch_size=64)
+    test_dataloader = DataLoader(test_dataset, batch_size=64)
 
     # defining the optimizer
-    optimizer = torch.optim.Adam(torch_regressor.parameters(), lr=0.001)
+    optimizer = torch.optim.Adam(torch_regressor.parameters(), lr=0.1)
     # defining Cross-Entropy loss
-    criterion = nn.MSELoss()
+    criterion = nn.BCELoss()
 
-    epochs = 50
+    epochs = 10
     for epoch in range(epochs):
         torch_regressor.train()
         for applicants, labels in tqdm(train_dataloader):
@@ -64,7 +75,11 @@ def main():
             optimizer.zero_grad()
             outputs = torch_regressor(applicants)
             loss = criterion(outputs, labels.unsqueeze(1))
-            loss.backward()
+            mf_loss = mf_violation_loss(torch_regressor, outputs, METRIC, train_dataset)
+            if mf_loss >= ALPHA * GAMMA:
+                mf_loss.backward()
+            else:
+                loss.backward()
             optimizer.step()
         with torch.no_grad():
             correct = 0
