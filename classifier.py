@@ -2,17 +2,17 @@
 # https://proceedings.mlr.press/v80/yona18a/yona18a.pdf
 
 
-from common import DATA_DIR, METRIC_DIR
 import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
 from tqdm import tqdm
 
+from common import DATA_DIR, METRIC_DIR
+
 
 ALPHA = 0.05
 GAMMA = 0.1
-
 
 metric = None
 
@@ -35,19 +35,22 @@ class LogisticRegression(nn.Module):
 
     def forward(self, x):
         linear = self.linear(x)
-        pred = crush_linear(linear)
+        pred = torch.sigmoid(linear)
         return pred
 
 
-def mf_violation_loss(model, indices, x, prediction, train_dataset):
+def mf_violation_loss(model, idx, x, prediction, train_dataset):
     sample_idx = torch.randint(
         high=len(train_dataset), size=(len(x),), requires_grad=False
     )
     sample = train_dataset[sample_idx][0]
+    sample_idx = sample[:, 0]
+    sample = sample[:, 1:]
 
     pred_p = model(sample)
+    print(prediction, pred_p)
     total_loss = torch.max(
-        torch.tensor(0.0), torch.abs(prediction - pred_p) - dist(x, sample)
+        torch.tensor(0.0), torch.abs(prediction - pred_p) - dist(idx, sample_idx)
     )
     return total_loss
 
@@ -87,7 +90,7 @@ def main():
     global metric
     metric = np.load(f"{METRIC_DIR}/metric.npy")
 
-    torch_regressor = LogisticRegression(len(features_train[0]), 1)
+    torch_regressor = LogisticRegression(len(features_train[0]) - 1, 1)
 
     train_dataset = TensorDataset(features_train, labels_train)
     test_dataset = TensorDataset(features_test, labels_test)
@@ -102,15 +105,15 @@ def main():
     for epoch in range(epochs):
         torch_regressor.train()
         for applicants, labels in tqdm(train_dataloader):
-            indices = applicants[:, 0]
+            idx = applicants[:, 0]
             applicants = applicants[:, 1:]
             optimizer.zero_grad()
             outputs = torch_regressor(applicants)
             loss = criterion(outputs, labels.unsqueeze(1))
-            applicants = torch.column_stack((indices, applicants))
             mf_loss = mf_violation_loss(
-                torch_regressor, indices, applicants, outputs, train_dataset
+                torch_regressor, idx, applicants, outputs, train_dataset
             )
+            print(mf_loss.mean())
             if mf_loss.mean() >= ALPHA * GAMMA:
                 mf_loss.backward()
             else:
@@ -120,6 +123,7 @@ def main():
             correct = 0
             torch_regressor.eval()
             for applicants, labels in test_dataloader:
+                applicants = applicants[:, 1:]
                 outputs = torch_regressor(applicants)
                 predicted = outputs.squeeze().round()
                 correct += (predicted == labels).sum()
