@@ -19,7 +19,7 @@ def crush_linear(x):
 
 
 def dist(x, y):
-    return torch.linalg.norm(x - y)
+    return torch.linalg.norm(x - y) / 350000500
 
 
 class LogisticRegression(nn.Module):
@@ -34,13 +34,14 @@ class LogisticRegression(nn.Module):
 
 
 def mf_violation_loss(model, x, prediction, train_dataset):
-    sample_idx = torch.randint(high=len(train_dataset))
+    sample_idx = torch.randint(high=len(train_dataset), size=(128,))
     sample = train_dataset[sample_idx]
+    print(sample[0].shape, sample[1].shape)
 
     total_loss = torch.tensor(0.0, requires_grad=True)
     for applicant in sample:
         pred_p = model(applicant)
-        total_loss += torch.max(0, torch.abs(prediction - pred_p) - dist(x, applicant))
+        total_loss += torch.max(0.0, torch.abs(prediction - pred_p) - dist(x, applicant))
     return total_loss
 
 
