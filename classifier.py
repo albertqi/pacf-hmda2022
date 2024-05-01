@@ -40,7 +40,7 @@ class LogisticRegression(nn.Module):
         return pred
 
 
-def mf_violation_loss(model, x, prediction, train_dataset):
+def mf_violation_loss(model, indices, x, prediction, train_dataset):
     sample_idx = torch.randint(
         high=len(train_dataset), size=(len(x),), requires_grad=False
     )
@@ -103,11 +103,14 @@ def main():
     for epoch in range(epochs):
         torch_regressor.train()
         for applicants, labels in tqdm(train_dataloader):
+            indices = applicants[:, 0]
+            applicants = applicants[:, 1:]
             optimizer.zero_grad()
             outputs = torch_regressor(applicants)
             loss = criterion(outputs, labels.unsqueeze(1))
+            applicants = torch.column_stack((indices, applicants))
             mf_loss = mf_violation_loss(
-                torch_regressor, applicants, outputs, train_dataset
+                torch_regressor, indices, applicants, outputs, train_dataset
             )
             if mf_loss.mean() >= ALPHA * GAMMA:
                 mf_loss.backward()
