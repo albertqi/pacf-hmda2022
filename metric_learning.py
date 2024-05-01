@@ -2,6 +2,7 @@
 # https://arxiv.org/pdf/1906.00250
 
 
+from common import DATA_DIR, METRIC_DIR
 import numpy as np
 import os
 from sklearn.preprocessing import normalize
@@ -10,8 +11,6 @@ from tqdm import tqdm
 
 ALPHA = 0.1
 NUM_REPS = 5  # Number of representatives.
-DATA_DIR = "data"
-METRIC_DIR = "metric"
 
 
 submetrics = {}  # submetrics.get(r)[x][y] = distance between `x` and `y` w.r.t. `r`.

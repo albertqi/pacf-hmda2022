@@ -1,11 +1,8 @@
+from common import DATA_DIR
 import pandas as pd
 from sklearn.preprocessing import OneHotEncoder
 
 
-DATA_PATH = "data/2022_public_lar_csv.csv"
-FILTERED_PATH = "data/filtered.csv"
-FEATURES_PATH = "data/features.csv"
-LABELS_PATH = "data/labels.csv"
 COLS = [
     "action_taken",
     "applicant_age",
@@ -66,17 +63,18 @@ def main():
 
     # Read the data from the CSV file.
     try:
-        df = pd.read_csv(FILTERED_PATH)
+        df = pd.read_csv(f"{DATA_DIR}/filtered.csv")
     except FileNotFoundError:
-        df = pd.read_csv(DATA_PATH)
+        df = pd.read_csv(f"{DATA_DIR}/2022_public_lar_csv.csv")
         df = df[df["state_code"] == "VT"][COLS]
-        df.to_csv(FILTERED_PATH, index=False)
+        df.to_csv(f"{DATA_DIR}/filtered.csv", index=False)
 
     # Preprocess each column.
     for col in COLS:
         df = preprocess(df, col).reset_index(drop=True)
 
-    df.to_csv("data/preonehot.csv", index=False)
+    # Write the data to a new CSV file.
+    df.to_csv(f"{DATA_DIR}/preonehot.csv", index=False)
 
     # Perform one-hot encoding on categorical columns.
     encoder = OneHotEncoder(sparse_output=False)
@@ -93,8 +91,8 @@ def main():
     y = df["action_taken"]
 
     # Write the features and labels to CSV files.
-    X.to_csv(FEATURES_PATH, index=False)
-    y.to_csv(LABELS_PATH, index=False)
+    X.to_csv(f"{DATA_DIR}/features.csv", index=False)
+    y.to_csv(f"{DATA_DIR}/labels.csv", index=False)
 
 
 if __name__ == "__main__":
