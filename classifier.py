@@ -34,14 +34,11 @@ class LogisticRegression(nn.Module):
 
 
 def mf_violation_loss(model, x, prediction, train_dataset):
-    sample_idx = torch.randint(high=len(train_dataset), size=(128,))
-    sample = train_dataset[sample_idx]
-    print(sample[0].shape, sample[1].shape)
+    sample_idx = torch.randint(high=len(train_dataset), size=(len(x),), requires_grad=False)
+    sample = train_dataset[sample_idx][0]
 
-    total_loss = torch.tensor(0.0, requires_grad=True)
-    for applicant in sample:
-        pred_p = model(applicant)
-        total_loss += torch.max(0.0, torch.abs(prediction - pred_p) - dist(x, applicant))
+    pred_p = model(sample)
+    total_loss = torch.max(torch.tensor(0.0), torch.abs(prediction - pred_p) - dist(x, sample))
     return total_loss
 
 
@@ -91,7 +88,7 @@ def main():
             mf_loss = mf_violation_loss(
                 torch_regressor, applicants, outputs, train_dataset
             )
-            if mf_loss >= ALPHA * GAMMA:
+            if mf_loss.mean() >= ALPHA * GAMMA:
                 mf_loss.backward()
             else:
                 loss.backward()
