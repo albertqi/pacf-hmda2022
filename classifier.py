@@ -1,16 +1,26 @@
+# Rothblum's and Yona's "Probably Approximately Metric-Fair Learning"
+# https://proceedings.mlr.press/v80/yona18a/yona18a.pdf
+
+
 import numpy as np
-from scipy.special import softmax
 from tqdm import tqdm
 import torch
 import torch.nn as nn
 from torch.utils.data import TensorDataset, DataLoader
 
+
 ALPHA = 0.05
 GAMMA = 0.1
 
+
 def crush_linear(x):
     y = 0.2 * x + 0.5
-    return torch.clamp(y, min = 0, max = 1)
+    return torch.clamp(y, min=0, max=1)
+
+
+def dist(x, y):
+    return torch.linalg.norm(x - y)
+
 
 class LogisticRegression(nn.Module):
     def __init__(self, n_inputs, n_outputs):
@@ -22,15 +32,17 @@ class LogisticRegression(nn.Module):
         pred = crush_linear(linear)
         return pred
 
-def mf_violation_loss(model, x, prediction, metric, train_dataset):
-    sample_idx = torch.randint(high = len(train_dataset))
+
+def mf_violation_loss(model, x, prediction, train_dataset):
+    sample_idx = torch.randint(high=len(train_dataset))
     sample = train_dataset[sample_idx]
 
-    total_loss = torch.tensor(0., requires_grad=True)
+    total_loss = torch.tensor(0.0, requires_grad=True)
     for applicant in sample:
         pred_p = model(applicant)
-        total_loss += torch.max(0, torch.abs(prediction - pred_p) - METRIC(x, applicant))
+        total_loss += torch.max(0, torch.abs(prediction - pred_p) - dist(x, applicant))
     return total_loss
+
 
 def main():
     torch.manual_seed(1)
@@ -75,7 +87,9 @@ def main():
             optimizer.zero_grad()
             outputs = torch_regressor(applicants)
             loss = criterion(outputs, labels.unsqueeze(1))
-            mf_loss = mf_violation_loss(torch_regressor, outputs, METRIC, train_dataset)
+            mf_loss = mf_violation_loss(
+                torch_regressor, applicants, outputs, train_dataset
+            )
             if mf_loss >= ALPHA * GAMMA:
                 mf_loss.backward()
             else:
@@ -89,7 +103,7 @@ def main():
                 predicted = outputs.squeeze().round()
                 correct += (predicted == labels).sum()
             accuracy = 100 * (correct.item()) / len(test_dataset)
-            print('Epoch: {}. Loss: {}. Accuracy: {}'.format(epoch, loss.item(), accuracy))
+            print(f"Epoch: {epoch}, Loss: {loss.item()}, Accuracy: {accuracy}")
 
 
 if __name__ == "__main__":
