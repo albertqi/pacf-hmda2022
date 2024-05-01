@@ -22,9 +22,8 @@ def crush_linear(x):
     return torch.clamp(y, min=0, max=1)
 
 
-def dist(x, y):
+def dist(x_inds, y_inds):
     assert metric is not None
-    x_inds, y_inds = x[:, 0], y[:, 0]
     res = [metric[int(x_ind)][int(y_ind)] for x_ind, y_ind in zip(x_inds, y_inds)]
     return torch.tensor(res)
 
